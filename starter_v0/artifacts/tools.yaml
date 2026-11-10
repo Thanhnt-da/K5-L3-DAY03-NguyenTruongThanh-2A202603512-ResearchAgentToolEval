@@ -16,13 +16,20 @@
 tools:
   # ---------------- Core tools ----------------
   - name: clarify
-    description: "Gửi một câu hỏi cho người dùng."
+    description: >
+      Hỏi lại người dùng một câu và chờ lượt trả lời.
+      QUY TẮC response_type:
+      - Mọi yêu cầu gửi/đăng/publish (Telegram...) -> response_type="yes_no",
+        câu hỏi xin xác nhận gửi, KỂ CẢ khi nội dung mới chỉ được nhắc chung
+        chung ("bản tin này"). Không hỏi xin nội dung bằng text trong trường hợp này.
+      - Thiếu handle, URL hoặc thông tin khác -> response_type="text".
+      - Có danh sách lựa chọn -> response_type="choice" kèm options.
     parameters:
       type: object
       properties:
-        question: {type: string, default: "", description: "Câu hỏi"}
-        response_type: {type: string, enum: [text, yes_no, choice], default: "text", description: "Kiểu trả lời"}
-        options: {type: array, default: [], items: {type: string}, description: "Các lựa chọn"}
+        question: {type: string, default: "", description: "Một câu hỏi ngắn, cụ thể."}
+        response_type: {type: string, enum: [text, yes_no, choice], default: "text", description: "yes_no khi xin xác nhận trước khi gửi/đăng; choice khi có options; text cho thông tin còn thiếu."}
+        options: {type: array, default: [], items: {type: string}, description: "Chỉ dùng khi response_type=choice."}
       required: [question]
 
   - name: timeline
@@ -45,14 +52,37 @@ tools:
       required: [query]
 
   - name: lookup
-    description: "Tra cứu thông tin trên internet."
+    description: >
+      Tìm trên web (Tavily). DÙNG khi người dùng hỏi thông tin, tin tức, sự kiện
+      chung trên internet và KHÔNG đưa URL cụ thể. KHÔNG dùng khi: cần bài đăng
+      của một tài khoản X (dùng timeline), bài đăng X theo từ khóa (dùng
+      social_search), hoặc đã có URL cần đọc (dùng fetch).
+      Quy ước: query chỉ chứa CHỦ ĐỀ CỐT LÕI; loại tin nằm ở topic, thời gian
+      nằm ở timeframe. Ví dụ:
+      "Tin AI hôm nay" -> query="AI", topic="news", timeframe="day";
+      "OpenAI tuần này" -> query="OpenAI", topic="news", timeframe="week";
+      "robotics là gì" -> query="robotics", topic="general".
     parameters:
       type: object
       properties:
-        query: {type: string, default: "", description: "Truy vấn"}
-        topic: {type: string, enum: [general, news], default: "general", description: "Phân loại"}
-        timeframe: {type: string, enum: [day, week, month, year], default: "week", description: "Khoảng thời gian"}
-        max_results: {type: integer, default: 5, description: "Số kết quả"}
+        query:
+          type: string
+          default: ""
+          description: >
+            Chỉ chủ đề cốt lõi, 1-3 từ (ví dụ "robotics", "OpenAI"). KHÔNG thêm
+            "news", "today", "latest", "tin tức", "hôm nay", "mới nhất" vào query;
+            đã có topic và timeframe lo phần đó.
+        topic:
+          type: string
+          enum: [general, news]
+          default: "general"
+          description: "news khi người dùng hỏi tin tức/sự kiện mới; general cho kiến thức chung."
+        timeframe:
+          type: string
+          enum: [day, week, month, year]
+          default: "week"
+          description: "hôm nay=day, tuần này=week, tháng này=month, năm nay=year. Giữ nguyên giá trị của lượt trước nếu người dùng nói 'vẫn là...' hoặc không đổi."
+        max_results: {type: integer, default: 5, description: "Số kết quả tối đa; chỉ đổi khi người dùng nêu số lượng."}
       required: [query]
 
   - name: fetch
@@ -86,12 +116,15 @@ tools:
 
   # ---------------- Bonus tools ----------------
   - name: send
-    description: "Gửi một đoạn văn bản đi."
+    description: >
+      Gửi text lên Telegram. KHÔNG gọi ở lần đầu người dùng yêu cầu gửi/đăng;
+      phải gọi clarify(response_type="yes_no") trước. Chỉ gọi send sau khi
+      người dùng đã đồng ý ở lượt sau, với confirmed=true.
     parameters:
       type: object
       properties:
-        text: {type: string, default: "", description: "Nội dung"}
-        confirmed: {type: boolean, default: false, description: "Cờ xác nhận"}
+        text: {type: string, default: "", description: "Nội dung đúng như đã cho người dùng xem."}
+        confirmed: {type: boolean, default: false, description: "true chỉ khi người dùng vừa xác nhận ở lượt gần nhất."}
       required: [text]
 
   - name: policy
