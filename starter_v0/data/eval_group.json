@@ -2,6 +2,279 @@
   "dataset_id": "day04_v2_research_group",
   "dataset_role": "group",
   "description": "Case do NHÓM tự viết thêm để cover thêm trường hợp. Mỗi case cần: id, phase='B', query HOẶC turns, failure_type (thuộc allowed_failure_types), và expect (tool_calls[...] hoặc no_tool=true). Nên kèm metadata.what_it_tests.",
-  "allowed_failure_types": ["wrong_tool", "wrong_arg_value", "wrong_boundary", "unnecessary_tool", "out_of_scope", "missing_info"],
-  "cases": []
+  "allowed_failure_types": [
+    "wrong_tool",
+    "wrong_arg_value",
+    "wrong_boundary",
+    "unnecessary_tool",
+    "out_of_scope",
+    "missing_info"
+  ],
+  "cases": [
+    {
+      "id": "G01_hn_topic_routing",
+      "phase": "B",
+      "suite": "group",
+      "query": "Trên Hacker News người ta đang nói gì về Rust?",
+      "failure_type": "wrong_tool",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "hn_search",
+            "args": {
+              "query": "Rust"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "new_tool_routing",
+        "difficulty": "easy",
+        "what_it_tests": "Nhắc Hacker News → hn_search (tool mới), không lookup/social_search; query chỉ chứa chủ đề cốt lõi."
+      }
+    },
+    {
+      "id": "G02_hn_latest_limit",
+      "phase": "B",
+      "suite": "group",
+      "query": "Cho mình 5 bài mới nhất trên HN về AI agents",
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "hn_search",
+            "args": {
+              "query": "AI agents",
+              "limit": 5,
+              "sort": "date"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "new_tool_args",
+        "difficulty": "medium",
+        "what_it_tests": "Viết tắt 'HN' + 'mới nhất' + số lượng → hn_search với sort=date và limit=5; không nhét 'HN'/'mới nhất' vào query."
+      }
+    },
+    {
+      "id": "G03_social_search_top",
+      "phase": "B",
+      "suite": "group",
+      "query": "Tìm các tweet nổi bật nhất về GPT-6",
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "social_search",
+            "args": {
+              "query": "GPT-6",
+              "search_type": "Top"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "search_type_arg",
+        "difficulty": "medium",
+        "what_it_tests": "Tìm tweet theo từ khóa, 'nổi bật nhất' → search_type=Top (không phải Latest mặc định); không dùng timeline vì không có tài khoản."
+      }
+    },
+    {
+      "id": "G04_out_of_scope_poem",
+      "phase": "B",
+      "suite": "group",
+      "query": "Viết giúp mình một bài thơ về mùa thu Hà Nội",
+      "failure_type": "out_of_scope",
+      "expect": {
+        "no_tool": true,
+        "behavior": "refuse"
+      },
+      "metadata": {
+        "skill": "out_of_scope",
+        "difficulty": "easy",
+        "what_it_tests": "Yêu cầu sáng tác ngoài phạm vi research (khác R08 toán / R14 code) → không gọi tool, nhất là không trả lời qua send."
+      }
+    },
+    {
+      "id": "G05_policy_data_privacy",
+      "phase": "B",
+      "suite": "group",
+      "query": "Chính sách nội bộ của công ty về dữ liệu cá nhân quy định gì?",
+      "failure_type": "wrong_tool",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "policy",
+            "args": {
+              "policy_area": "data_privacy"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "internal_policy_routing",
+        "difficulty": "medium",
+        "what_it_tests": "Hỏi chính sách nội bộ → policy (không lookup web) với policy_area=data_privacy."
+      }
+    },
+    {
+      "id": "G06_clarify_then_fetch",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tóm tắt bài viết này hộ mình"
+        },
+        {
+          "role": "user",
+          "content": "Link đây: https://example.com/ai-agents-2026"
+        }
+      ],
+      "failure_type": "missing_info",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "fetch",
+            "args": {
+              "url": "https://example.com/ai-agents-2026"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_clarify_fill_url",
+        "difficulty": "medium",
+        "what_it_tests": "Lượt 1 thiếu link (agent nên hỏi); lượt 2 user gửi URL → fetch đúng URL đó, không hỏi lại nữa."
+      }
+    },
+    {
+      "id": "G07_send_after_confirmation",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Đăng bản tin này lên Telegram giúp mình: 'AI hôm nay: OpenAI ra mắt mô hình mới'"
+        },
+        {
+          "role": "user",
+          "content": "Ừ, mình xác nhận, gửi đi"
+        }
+      ],
+      "failure_type": "wrong_boundary",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "send",
+            "args": {
+              "confirmed": true
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_confirm_then_send",
+        "difficulty": "hard",
+        "what_it_tests": "Ranh giới send chiều ngược lại của R12: user đã đồng ý ở lượt sau → gọi send với confirmed=true, không hỏi xác nhận lần nữa."
+      }
+    },
+    {
+      "id": "G08_change_timeframe",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Tin tức AI tuần này có gì đáng chú ý?"
+        },
+        {
+          "role": "user",
+          "content": "Đổi sang tin hôm nay thôi nhé"
+        }
+      ],
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "lookup",
+            "args": {
+              "query": "AI",
+              "topic": "news",
+              "timeframe": "day"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_change_timeframe",
+        "difficulty": "medium",
+        "what_it_tests": "Lượt 1 tin tuần này; lượt 2 đổi sang hôm nay → giữ query=AI, topic=news, đổi timeframe=day."
+      }
+    },
+    {
+      "id": "G09_correction_person_name",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Cho mình xem tweet mới nhất của Sam Altman"
+        },
+        {
+          "role": "user",
+          "content": "À nhầm, ý mình là Elon Musk"
+        }
+      ],
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "timeline",
+            "args": {
+              "screenname": "elonmusk"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_correction_name_to_handle",
+        "difficulty": "medium",
+        "what_it_tests": "User sửa người ở lượt 2 bằng TÊN (không phải handle) → timeline với handle elonmusk, bỏ sama của lượt 1."
+      }
+    },
+    {
+      "id": "G10_hn_followup_sort",
+      "phase": "B",
+      "suite": "group",
+      "turns": [
+        {
+          "role": "user",
+          "content": "Trên HN người ta nói gì về Rust?"
+        },
+        {
+          "role": "user",
+          "content": "Chỉ lấy những bài mới nhất thôi"
+        }
+      ],
+      "failure_type": "wrong_arg_value",
+      "expect": {
+        "tool_calls": [
+          {
+            "name": "hn_search",
+            "args": {
+              "query": "Rust",
+              "sort": "date"
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "skill": "multiturn_new_tool_followup",
+        "difficulty": "hard",
+        "what_it_tests": "Follow-up trên tool mới: giữ chủ đề Rust từ lượt 1, đổi sang sort=date khi user muốn bài mới nhất."
+      }
+    }
+  ]
 }
