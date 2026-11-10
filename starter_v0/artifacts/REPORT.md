@@ -2,7 +2,7 @@
 
 > File này gồm 2 phần:
 > - **PHẦN A — Giới thiệu agent**: 1 trang để người khác hiểu nhanh agent có tool gì, làm được gì, thử bằng câu hỏi nào.
-> - **PHẦN B — Chi tiết / Bằng chứng**: bảng v0–v5, failure analysis, eval, chat — dựa trên log thật trong `runs/*.json` và `artifacts/version_log.csv`.
+> - **PHẦN B — Chi tiết / Bằng chứng**: bảng v0–v7, failure analysis, eval, chat — dựa trên log thật trong `runs/*.json` và `artifacts/version_log.csv`.
 >
 > Mục đánh dấu **⏳ Chưa làm** là phần còn thiếu bằng chứng; sẽ điền khi có file tương ứng.
 
@@ -66,6 +66,8 @@ Từ `artifacts/version_log.csv` và `runs/*.json`. Base eval: `data/eval_base.j
 | v3 | Vũ Quốc Đạt | `system_prompt.md` + `tools.yaml` | Prompt bảo gửi ngay → `send` không xin xác nhận; description `lookup` không quy ước args | 0.95 | 0.90 | `runs/v3_B_base_openrouter_20261110T211659344732.json` (+ rerun `…211801089140`) |
 | v4 | Nguyễn Trường Thành | `tools.yaml` (`timeline`) | Description `timeline` không nói tên người là đủ; cộng với sự "cẩn thận" của v3 → model hỏi handle dù đã có tên | 0.90 | 1.00 | `runs/v4_B_base_openrouter_20261110T222609899968.json` (+ rerun `…222830909561`) |
 | v5 | Nguyễn Trường Thành | `tools.yaml` + tool mới `hn_search` | Thêm tool mới có rule khi-nào-dùng / khi-nào-không rõ ràng thì không "cướp" routing của tool cũ | 1.00 | 1.00 | `runs/v5_B_base_openrouter_20261110T234031189892.json` (+ rerun `…234158436428`) |
+| v6 ❌ | Nguyễn Trường Thành | `tools.yaml` (`lookup`) | Không có rule "chỉ gọi lookup một lần", nên ở câu follow-up (G08) model gọi thêm `topic=general` để phủ rộng | 0.90 ² | 0.90 ² | `runs/v6_B_group_openrouter_20261111T001734791518.json` (+ rerun `…001815200200`) |
+| v7 | Nguyễn Trường Thành | `tools.yaml` (revert về v5) | Thay đổi không cải thiện metric thì không giữ lại | 0.90 ² | 0.90 ² | `runs/v7_B_group_openrouter_20261111T002027800899.json` |
 
 Chi tiết các metric (lần chạy chính thức đầu tiên của mỗi version):
 
@@ -77,8 +79,20 @@ Chi tiết các metric (lần chạy chính thức đầu tiên của mỗi vers
 | v3 | `v3+p63c74d3a7a03+ta48811a72a50` | 0.90 | 0.90 | 0.90 | 1.00 | R01, R05 |
 | v4 | `v4+p63c74d3a7a03+ta3b271ddd5c3` | 1.00 | 1.00 | 1.00 | 1.00 | — |
 | v5 | `v5+p63c74d3a7a03+t2b526d69d12d` | 1.00 | 1.00 | 1.00 | 1.00 | — |
+| v6 | `v6+p63c74d3a7a03+t9969f9423ab5` | 1.00 | 1.00 | 1.00 | 1.00 | — |
+| v7 | `v7+p63c74d3a7a03+t2b526d69d12d` | 1.00 | 1.00 | 1.00 | 1.00 | — |
+
+Team eval (`data/eval_group.json`, 10 case: 5 single turn + 5 multi turn), mỗi version chạy 2 lần (v7: 1 lần):
+
+| Version | case | routing | args | multiturn | Case FAIL | Run Files |
+|---|---:|---:|---:|---:|---|---|
+| v5 | 0.90 | 0.90 | 0.90 | 0.80 | G08 (2/2 lần) | `runs/v5_B_group_openrouter_20261111T000326144808.json`, `…000611244285` |
+| v6 | 0.90 | 0.90 | 0.90 | 0.80 | G08 (2/2 lần) | `runs/v6_B_group_openrouter_20261111T001734791518.json`, `…001815200200` |
+| v7 | 0.90 | 0.90 | 0.90 | 0.80 | G08 | `runs/v7_B_group_openrouter_20261111T002027800899.json` |
 
 Ghi chú:
+- ² v6 và v7 nhắm vào team eval nên `metric_before/after` trong log là **case_accuracy của group suite**, không phải base. Base giữ 20/20 ở cả hai.
+- **v6 bị bác bỏ, v7 = v5:** v7 khôi phục `system_prompt.md` và `tools.yaml` về đúng v5 (cùng hash `p63c74d3a7a03` / `t2b526d69d12d`), nên phiên bản cuối cùng là v5/v7. Các thử nghiệm nhanh trước v6 nằm trong `runs/experiments/` (xem B2).
 - ¹ Run v2 được chạy với nhãn `--version v0` nên tên file và `artifact_version` trong file là `v0+p293507e58e49+…`; prompt hash `293507e58e49` khớp đúng prompt v2, nên kết quả là của v2. Chỉ có 1 lần chạy.
 - **Độ dao động của v0:** prompt starter chạy 3 lần cho 0.65 / 0.70 / 0.75 (`runs/v0_…102000734674`, `…110819290280`, `…100439292099`). Vì vậy chênh lệch 1 case (0.05) giữa hai lần chạy không đủ để kết luận; các version sau đều chạy 2 lần và cho kết quả giống hệt nhau.
 - `runs/v0_B_base_openrouter_20261110T111707203457.json` (0.85) dùng prompt/tools khác (`pc8854af81ce2`, `t3811c856b575`) — là thử nghiệm, không phải version chính thức.
@@ -97,18 +111,40 @@ Từ `results[*].result.failures` và `actual_tool_calls` trong các run file.
 | R08_out_of_scope / R14_out_of_scope_coding (v0) | out_of_scope | `send(text="Nguyên hàm của x^2 là …")` | Câu hỏi ngoài phạm vi (toán, code) nhưng model trả lời **qua `send`** vì prompt ép "Pick one tool" | v1 (tác dụng phụ): bỏ câu "hates being asked… call a tool right away" → model trả lời bằng text |
 | R03 / R13 (v0) | wrong_tool | `lookup(query="AI news", …)`; R13 thiếu `topic="news"` | Lặp "news" trong `query` dù đã có `topic`; R13 thiếu `topic`. R03 chỉ fail 1/3 lần chạy v0 (dao động ngẫu nhiên), R13 fail 3/3 | Hết lỗi từ v1 (2/2 lần, tác dụng phụ — không phải sửa có chủ đích); v3 thêm quy ước "query chỉ chứa chủ đề cốt lõi" vào `lookup` |
 | R01_user_tweets_routing / R05_limit_arg (v3) | wrong_tool | `clarify(question="Bạn muốn xem tweet của tài khoản nào?")` | **Regression của v3:** user đã nêu "Sam Altman" / "Elon Musk" nhưng model vẫn hỏi tài khoản nào | v4: description `timeline` cho phép dùng tên người, có ví dụ tên → handle |
+| G08_change_timeframe (team eval, v5–v7) | wrong_arg_value (`extra_tool_call`) | `lookup(query="AI", topic="news", timeframe="day")` **+** `lookup(query="AI", topic="general", timeframe="day")` | Lời gọi đầu đúng hoàn toàn; model gọi thêm một `lookup` general để "phủ rộng" → `extra tool call lookup`. Xảy ra 2/2 lần ở v5, v6 và cả 4 thử nghiệm nhanh | **Chưa sửa được** — giữ là known limitation (xem bảng thử nghiệm bên dưới) |
+
+Các thử nghiệm để sửa G08 (thử nhanh trên G08 + guard R13, M02, M06, G07, mỗi cái 2 lần; file trong `runs/experiments/`):
+
+| Thử nghiệm | Thay đổi | G08 | Kết luận |
+|---|---|---|---|
+| `try-v6` | `system_prompt.md`: thu hẹp rule "nhiều nguồn" của v3 (chỉ gọi nhiều tool khi user yêu cầu rõ nhiều loại nguồn; không gọi lại cùng tool với setting khác) | ❌ 0/2 | Bác bỏ: rule của v3 không phải nguyên nhân |
+| `try-v6b` (= v6 chính thức) | description `lookup`: "chỉ gọi lookup MỘT lần với đúng MỘT topic" | ❌ 0/2 | Bác bỏ |
+| `try-v6c` | + ví dụ follow-up **trùng gần như nguyên văn G08** ("Tin AI tuần này" → "Đổi sang hôm nay") | ✅ 2/2 | Pass nhưng là học thuộc case eval |
+| `try-v6d` | cùng ví dụ nhưng đổi chủ đề/thời gian (robotics, hôm nay → tháng này) | ❌ 0/2 (G07 cũng fail 1/2) | Bác bỏ: model chỉ "nhớ" đúng câu G08, không học được quy tắc chung |
 
 Nhận xét chính:
 - 5/7 lỗi của v0 đến trực tiếp từ các câu xấu cố ý trong prompt starter (đoán thay vì hỏi, gửi không cần xác nhận, ép một tool).
 - **Một thay đổi có thể sửa nhiều case** (v1 sửa R10 và kéo theo R08/R14/R03/R13) và **một thay đổi cũng có thể làm hỏng case khác** (v3 sửa R12 nhưng làm R01/R05 fail). Chạy toàn bộ eval sau mỗi thay đổi, không chỉ case mục tiêu, là điều bắt buộc.
+- **Một "fix" chỉ có tác dụng khi chép nguyên case eval vào description là overfitting** (G08: `try-v6c` pass, `try-v6d` fail). Cách kiểm tra: đổi ví dụ sang chủ đề khác; nếu case lại fail thì model chưa học được quy tắc.
 
 ## B3. Team Eval Cases
 
-> ⏳ Chưa làm — `data/eval_group.json` hiện có 0 case. Cần 10 case (5 single turn + 5 multi turn), trong đó ít nhất 1 case route tới `hn_search`. Đã kiểm thử nháp 3 case `hn_search` (route theo chủ đề, `limit`+`sort=date`, và case guard tin tức web → `lookup`): PASS 2/2 lần, sẽ đưa vào file chính thức.
+10 case trong `data/eval_group.json` (5 single turn + 5 multi turn), 3 case route tới tool mới `hn_search`. Kết quả trên phiên bản cuối (v5 = v7), 2 lần chạy v5 + 1 lần v7: **9/10**.
 
 | Case ID | What It Tests | Expected Tool/Behavior | Result |
 |---|---|---|---|
-|  |  |  |  |
+| G01_hn_topic_routing | Nhắc Hacker News → tool mới, `query` chỉ chứa chủ đề | `hn_search(query="Rust")` | ✅ 3/3 |
+| G02_hn_latest_limit | "HN" viết tắt + "mới nhất" + số lượng | `hn_search(query="AI agents", limit=5, sort="date")` | ✅ 3/3 |
+| G03_social_search_top | "nổi bật nhất" → `Top`, không phải `Latest` mặc định | `social_search(query="GPT-6", search_type="Top")` | ✅ 3/3 |
+| G04_out_of_scope_poem | Yêu cầu sáng tác ngoài phạm vi (khác R08/R14) | không gọi tool | ✅ 3/3 |
+| G05_policy_data_privacy | Hỏi chính sách nội bộ → `policy`, không tìm web | `policy(policy_area="data_privacy")` | ✅ 3/3 |
+| G06_clarify_then_fetch | (multi) thiếu link → lượt sau có URL → đọc luôn | `fetch(url="https://example.com/ai-agents-2026")` | ✅ 3/3 |
+| G07_send_after_confirmation | (multi) chiều ngược lại của R12: user đã đồng ý → gửi thật | `send(confirmed=true)` | ✅ 3/3 ³ |
+| G08_change_timeframe | (multi) đổi `timeframe` tuần → hôm nay, giữ `query`/`topic` | `lookup(query="AI", topic="news", timeframe="day")`, **chỉ một lời gọi** | ❌ 0/3 — thêm `lookup` general (xem B2) |
+| G09_correction_person_name | (multi) sửa người bằng TÊN → handle | `timeline(screenname="elonmusk")` | ✅ 3/3 |
+| G10_hn_followup_sort | (multi) follow-up trên tool mới: giữ chủ đề, đổi `sort` | `hn_search(query="Rust", sort="date")` | ✅ 3/3 |
+
+³ G07 gọi `send(confirmed=true)` nhưng không có gì được gửi thật vì chưa cấu hình `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` (tool trả `Missing TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID env var`). Eval chỉ chấm lời gọi tool. Trong thử nghiệm `try-v6d`, G07 fail 1/2 lần (hỏi xác nhận lại) — case này chưa hoàn toàn ổn định.
 
 ## B4. Live Chat Evidence
 
@@ -136,7 +172,8 @@ Tool unit tests: viết **9 test** cho `hn_search` (3 happy path: request/mappin
 - **Which fixes belonged in `system_prompt.md`?** Hành vi chung, áp dụng cho mọi tool: khi nào hỏi lại thay vì đoán (v1, v2), ranh giới hành động có tác động bên ngoài như gửi/đăng (v3), được phép gọi nhiều tool trong một lượt. Đây là chính sách của agent, không thuộc về một tool cụ thể.
 - **Which fixes belonged in `tools.yaml`?** Mọi thứ về một tool: khi nào dùng / không dùng (v4 `timeline`, v5 `hn_search`), quy ước args (`query` chỉ chủ đề cốt lõi, `topic`, `timeframe`, handle không có `@`) và ví dụ lời gọi. Bài học từ v1: model dựng tool call chủ yếu từ schema và ví dụ; một câu chỉ dẫn trong prompt không đủ để model điền arg optional, nhưng một **ví dụ lời gọi đầy đủ** thì đủ.
 - **Which failure needed manual review instead of automatic grading?** (1) R08/R14 ở v0: eval chỉ báo "expected no tool call", phải đọc `args` mới thấy model đang trả lời bài toán *qua `send`* — một lỗi nguy hiểm hơn nhiều so với "gọi thừa tool". (2) Run v2 mang nhãn `v0`, và dòng log v3 ban đầu có hash không khớp file đã commit — phải so hash bằng tay mới phát hiện. (3) Độ dao động của v0 (0.65–0.75): phải chạy lại để biết thay đổi là thật hay ngẫu nhiên.
-- **What would you improve next?** Viết 10 case `eval_group.json` để kiểm tra những gì base eval không có (base 20/20 có thể là overfit vào 20 case đã biết); hoàn thành 17 stub test; thêm 3 tool mới; chạy UI + transcript; sửa ví dụ còn sót `Elon Musk -> @elonmusk` trong `timeline` (mâu thuẫn với quy ước handle không có `@`) như một version riêng.
+  (4) G08: cần đọc `actual_tool_calls` mới thấy lời gọi đầu tiên **đúng hoàn toàn**, chỉ thừa một lời gọi — và cần thử ví dụ khác chủ đề mới phát hiện "fix" `try-v6c` chỉ là học thuộc case.
+- **What would you improve next?** Base đạt 20/20 từ v4, nhưng team eval vẫn tìm ra G08 — bằng chứng rằng 20 case đã tối ưu không đủ đánh giá agent. Tiếp theo: thử sửa G08 ở tầng code thay vì prompt (ví dụ agent bỏ các lời gọi trùng tool trong cùng một lượt) và ghi là thay đổi harness riêng; hoàn thành 17 stub test; thêm 3 tool mới; chạy UI + transcript; sửa ví dụ còn sót `Elon Musk -> @elonmusk` trong `timeline` (mâu thuẫn với quy ước handle không có `@`) như một version riêng.
 
 ## B7. Small Local Model Challenge (bonus)
 
