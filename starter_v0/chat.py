@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 from datetime import datetime
@@ -39,6 +40,29 @@ def trim_history(history: list[dict[str, str]], window: int) -> list[dict[str, s
     if window <= 0:
         return []
     return history[-window * 2:]
+
+
+def parse_text_tool_call(text: str | None) -> ToolCall | None:
+    if not text:
+        return None
+    cleaned = text.strip().strip("`").strip()
+    try:
+        parsed = ast.parse(cleaned)
+        if len(parsed.body) == 1 and isinstance(parsed.body[0], ast.Expr) and isinstance(parsed.body[0].value, ast.Call):
+            call_node = parsed.body[0].value
+            if isinstance(call_node.func, ast.Name) and call_node.func.id in TOOL_FUNCTIONS:
+                args = {}
+                for kw in call_node.keywords:
+                    if kw.arg is None:
+                        continue
+                    try:
+                        args[kw.arg] = ast.literal_eval(kw.value)
+                    except Exception:
+                        args[kw.arg] = str(kw.value)
+                return ToolCall(name=call_node.func.id, args=args)
+    except Exception:
+        pass
+    return None
 
 
 def execute_tool_call(call: ToolCall) -> dict[str, Any]:
@@ -98,6 +122,12 @@ def run_model_tool_loop(
             "tool_calls": [{"name": call.name, "args": call.args} for call in calls],
             "tool_results": [],
         }
+
+        if not calls and response.text:
+            fallback = parse_text_tool_call(response.text)
+            if fallback:
+                calls = [fallback]
+                round_record["tool_calls"] = [{"name": fallback.name, "args": fallback.args}]
 
         if not calls:
             rounds.append(round_record)

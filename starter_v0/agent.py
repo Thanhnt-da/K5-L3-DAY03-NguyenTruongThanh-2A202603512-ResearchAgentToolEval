@@ -37,8 +37,15 @@ class ResearchAgent:
             temperature=0.0,
             tool_choice=tool_choice,
         )
+        calls = list(response.tool_calls)
+        if not calls and response.text:
+            from chat import parse_text_tool_call
+            fallback = parse_text_tool_call(response.text)
+            if fallback:
+                calls.append(fallback)
+
         results: list[dict[str, Any]] = []
-        for call in response.tool_calls:
+        for call in calls:
             func = TOOL_FUNCTIONS.get(call.name)
             if not func:
                 results.append({"tool": call.name, "error": "unknown_tool"})
@@ -48,4 +55,4 @@ class ResearchAgent:
             except Exception as exc:  # keep eval robust; failures are evidence
                 result = {"error": type(exc).__name__, "message": str(exc)}
             results.append({"tool": call.name, "args": call.args, "result": result})
-        return AgentRun(text=response.text, tool_calls=response.tool_calls, tool_results=results)
+        return AgentRun(text=response.text, tool_calls=calls, tool_results=results)
