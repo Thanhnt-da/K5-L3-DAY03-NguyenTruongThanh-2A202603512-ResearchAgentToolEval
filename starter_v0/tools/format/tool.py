@@ -18,8 +18,29 @@ def _bullet(item: dict[str, Any]) -> str:
     return f"- {text} - {_src(item)}"
 
 
+def _normalize_items(items: Any) -> list[dict[str, Any]]:
+    """Models sometimes send items as plain strings or one object instead of a list of dicts.
+
+    Without this, item.get(...) raised AttributeError and the tool crashed instead of
+    returning a result. Strings become {"title": text}; anything else is dropped.
+    """
+    if not items:
+        return []
+    if isinstance(items, dict):
+        items = [items]
+    if isinstance(items, str):
+        items = [items]
+    normalized: list[dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, dict):
+            normalized.append(item)
+        elif isinstance(item, str) and item.strip():
+            normalized.append({"title": item.strip()})
+    return normalized
+
+
 def render_digest(items: list[dict[str, Any]] | None = None, template: str = "sections", headline: str = "") -> dict[str, Any]:
-    items = items or []
+    items = _normalize_items(items)
     if template == "brief":
         markdown = (f"**{headline}**\n\n" if headline else "") + "\n".join(_bullet(item) for item in items[:5])
     elif template == "bullets":
