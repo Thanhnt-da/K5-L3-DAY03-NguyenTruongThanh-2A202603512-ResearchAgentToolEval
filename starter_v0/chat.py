@@ -4,6 +4,7 @@ import argparse
 import ast
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,19 @@ from versioning import artifact_version_dict, build_artifact_version
 ROOT = Path(__file__).parent
 ARTIFACTS_DIR = ROOT / "artifacts"
 load_lab_env(ROOT)
+
+
+def console_log(line: str) -> None:
+    """print() that never crashes on characters the console cannot encode.
+
+    On Windows the console is often cp1252, which has no emoji or Vietnamese
+    letters. A plain print("🔧 ...") then raises UnicodeEncodeError and kills
+    the whole tool loop (in chat.py and in the Streamlit UI, which reuses this
+    loop). Unencodable characters are replaced with "?" instead.
+    """
+    stream = sys.stdout
+    encoding = getattr(stream, "encoding", None) or "utf-8"
+    print(line.encode(encoding, errors="replace").decode(encoding), file=stream)
 
 
 def now_iso() -> str:
@@ -142,7 +156,7 @@ def run_model_tool_loop(
         non_clarification_events: list[dict[str, Any]] = []
 
         for call in calls:
-            print(f"🔧 {call.name}({json.dumps(call.args, ensure_ascii=False, sort_keys=True)})")
+            console_log(f"🔧 {call.name}({json.dumps(call.args, ensure_ascii=False, sort_keys=True)})")
             event = execute_tool_call(call)
             round_record["tool_results"].append(event)
             all_tool_events.append(event)
@@ -263,7 +277,7 @@ def main() -> None:
             )
             turn_record.update(result)
             assistant_text = result["assistant_text"]
-            print(f"\nAgent> {assistant_text}")
+            console_log(f"\nAgent> {assistant_text}")
             history.append({"role": "user", "content": user_text})
             history.append({"role": "assistant", "content": assistant_text})
         except Exception as exc:
@@ -271,7 +285,7 @@ def main() -> None:
                 "status": "provider_error",
                 "error": f"{type(exc).__name__}: {str(exc)}",
             })
-            print(f"\nERROR> {turn_record['error']}")
+            console_log(f"\nERROR> {turn_record['error']}")
 
         turn_record["ended_at"] = now_iso()
         transcript["turns"].append(turn_record)
