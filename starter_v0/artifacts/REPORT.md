@@ -148,11 +148,18 @@ Nhận xét chính:
 
 ## B4. Live Chat Evidence
 
-> ⏳ Chưa làm — chưa có `transcripts/*.transcript.json`. Cần ≥ 3 lượt live bằng `python chat.py --provider openrouter --version v5` (hoặc qua UI): một yêu cầu research bình thường, một yêu cầu thiếu thông tin rồi bổ sung, một yêu cầu đăng Telegram.
+Transcript: `transcripts/v7_openrouter_20261111T003250077641.transcript.json` — chạy bằng `python chat.py --provider openrouter --version v7`, 4 lượt live, model `openai/gpt-4o-mini`.
 
 | Turn | User Request | Tool Calls | Version Evidence | Outcome |
 |---|---|---|---|---|
-|  |  |  |  |  |
+| 1 | "Tin tức AI hôm nay có gì nổi bật?" | `lookup(query="AI", topic="news", timeframe="day")` → vòng 2 trả lời | `v7+p63c74d3a7a03+t2b526d69d12d` | ✅ Tóm tắt các tin AI trong ngày kèm link nguồn; đúng quy ước args của `lookup` (v3) |
+| 2 | "Tóm tắt 5 tweet mới nhất giúp mình" | *(không gọi tool)* | `v7+p63c74d3a7a03+t2b526d69d12d` | ✅ Hỏi lại "Bạn muốn xem tweet của tài khoản nào?" — không đoán tài khoản (v1). ⚠️ Hỏi bằng text, không qua tool `clarify` (xem ghi chú) |
+| 3 | "Của Sam Altman nhé" | `timeline(screenname="sama", limit=5)` → vòng 2 trả lời | `v7+p63c74d3a7a03+t2b526d69d12d` | ✅ Mang `limit=5` từ lượt 2, đổi tên → handle `sama` (v4); trả 5 tweet thật kèm link, ngày, số view |
+| 4 | "Đăng bản tin này lên Telegram giúp mình" | *(không gọi tool)* | `v7+p63c74d3a7a03+t2b526d69d12d` | ✅ Hỏi "Bạn xác nhận muốn gửi bản tin này lên Telegram chứ?" — **không gửi ngay** (v3). Người dùng không xác nhận nên không có lời gọi `send` |
+
+Ghi chú (cần review thủ công, eval tự động không thấy):
+- Ở lượt 2 và 4 agent hỏi lại **bằng câu trả lời text** chứ không gọi tool `clarify`. Lý do: eval chạy với `tool_choice="required"` nên model buộc phải gọi một tool (và chọn `clarify`); còn `chat.py` không ép, nên model tự chọn hỏi bằng text. Với người dùng hành vi vẫn đúng (hỏi trước, không đoán, không gửi), nhưng `response_type="yes_no"` và trạng thái `waiting_for_user` không được ghi lại. Đây là khác biệt giữa harness eval và chat thật — điểm eval cao không đảm bảo agent dùng đúng tool trong hội thoại thật.
+- Luồng xác nhận → gửi thật (`send(confirmed=true)`) chưa có trong transcript; đã được kiểm tra bằng eval G07 (B3).
 
 ## B5. Bonus Evidence
 
@@ -160,10 +167,12 @@ Nhận xét chính:
 |---|---|---|---|
 | send (Telegram) | R12 trong `runs/v3_…`, `runs/v4_…`, `runs/v5_…` | Eval: yêu cầu đăng → `clarify(response_type="yes_no")` thay vì gửi ngay (PASS từ v3) | Code `send` không gọi mạng khi `confirmed=false` (test `test_send_without_confirmation_does_not_call_network`). ⏳ Chưa cấu hình `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`, chưa có transcript gửi thật |
 | arXiv/company policy | — | ⏳ Chưa kiểm thử riêng (tool có sẵn, đã khai báo) | — |
-| UI | `app.py` (Lê Nhật Linh) | Giao diện Streamlit dùng lại vòng lặp tool của `chat.py` | ⏳ Chưa chạy/kiểm tra; `streamlit` chưa có trong `requirements.txt`; chưa có link |
-| Tool unit tests (`tests/`) | `tests/test_tool_hn_search.py`; `pytest` → 76 passed, 17 skipped | 9 test cho `hn_search` + contract test cho tool mới | 17 stub trong `tests/test_tools_todo.py` vẫn `skip` |
+| UI | `app.py` (Lê Nhật Linh); `streamlit run app.py` | Giao diện Streamlit dùng lại vòng lặp tool của `chat.py`. Đã chạy thử: "Cho mình 3 bài mới nhất trên HN về AI agents" → gọi `hn_search`, hiển thị 3 story thật kèm nguồn/ngày/tác giả/link thảo luận | Đã thêm `streamlit` vào `requirements.txt`. UI không lưu transcript (bằng chứng live dùng `chat.py`, B4). ⏳ Chưa có link public |
+| Tool unit tests (`tests/`) | `tests/test_tool_hn_search.py`, `tests/test_chat_console_encoding.py`; `pytest` → 78 passed, 17 skipped | 9 test cho `hn_search` + contract test cho tool mới + 2 regression test cho bug console | 17 stub trong `tests/test_tools_todo.py` vẫn `skip` |
 
-Tool unit tests: viết **9 test** cho `hn_search` (3 happy path: request/mapping, `sort=date` đổi endpoint, bài "Ask HN" không có URL; 4 input xấu từ model: `query` rỗng, `sort` ngoài enum, `limit` dạng chuỗi/0/500/"abc", hit thiếu `objectID`; 2 nhánh lỗi: HTTP 429, mất mạng → trả error dict, không raise). Chưa tìm thấy bug trong tool có sẵn (chưa làm phần stub).
+Tool unit tests: viết **9 test** cho `hn_search` (3 happy path: request/mapping, `sort=date` đổi endpoint, bài "Ask HN" không có URL; 4 input xấu từ model: `query` rỗng, `sort` ngoài enum, `limit` dạng chuỗi/0/500/"abc", hit thiếu `objectID`; 2 nhánh lỗi: HTTP 429, mất mạng → trả error dict, không raise).
+
+**Bug tìm được trong code có sẵn (đã sửa + regression test):** khi chạy UI trên Windows, mọi yêu cầu có gọi tool đều crash với `UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f527'`. Nguyên nhân: vòng lặp tool trong `chat.py` dùng `print(f"🔧 {call.name}(...)")`, còn console Windows dùng cp1252 — không có emoji và chữ tiếng Việt như "ứ". Lỗi này làm hỏng cả `python chat.py` (in câu trả lời tiếng Việt) lẫn `app.py` (dùng lại cùng vòng lặp). Sửa: thêm `chat.console_log()` thay ký tự không mã hóa được bằng `?`. Regression test `tests/test_chat_console_encoding.py` giả lập stdout cp1252: **cả 2 test fail trên code cũ và pass sau khi sửa**. Eval không bắt được lỗi này vì `run_eval.py` không đi qua `print` đó.
 
 **Ví dụ lỗi unit test bắt được mà eval không bắt được:** eval chỉ chấm model gọi `hn_search(query="Rust", limit=5)` có đúng tên/args hay không. Nếu code quên kẹp `limit` (model gửi `limit=500` hoặc `"abc"`), eval vẫn PASS nhưng tool sẽ gửi `hitsPerPage=500` hoặc crash. `test_hn_search_limit_string_zero_and_huge_are_clamped` kiểm tra đúng request gửi đi (`hitsPerPage` = 3, 1, 20, 5).
 
