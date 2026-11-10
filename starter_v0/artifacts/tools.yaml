@@ -33,11 +33,16 @@ tools:
       required: [question]
 
   - name: timeline
-    description: "Lấy các bài đăng gần đây."
+    description: >
+      Lấy các bài đăng gần đây trên tài khoản X của một người. 
+      Có thể dùng khi người dùng đã đưa ra tên là đủ, không cần cả @ hay handle. 
+      Ví dụ Sam Altman -> sama, Elon Musk -> @elonmusk.
+      Tool này không nên dùng khi người dùng chưa đưa ra tên cụ thể -> dùng clarify
+      nếu tìm theo keyword -> social_search
     parameters:
       type: object
       properties:
-        screenname: {type: string, default: "", description: "Tên tài khoản"}
+        screenname: {type: string, default: "", description: "Tên tài khoản hoặc handle không có @"}
         limit: {type: integer, default: 5, description: "Số lượng"}
       required: [screenname]
 
